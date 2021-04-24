@@ -169,9 +169,12 @@ struct Bot {
         return required_time;
     }
 
-    const int calculate_score(const Task& task) {
+    const double calculate_score(const Task& task) {
         // 自分の達成による過去の得点の減少分は無視する
-        return task.weight / (task.total + 1);
+        int remaining_time = master_data.game_period - game_info.now;
+        double predicted_speed = (double)(task.total + 100) / (game_info.now - task.t + 1);
+        double predicted_total = task.total + predicted_speed * remaining_time + 100;
+        return (double)task.weight / predicted_total;
     }
 
     const Task choice_task(int index) {
@@ -184,6 +187,7 @@ struct Bot {
                 result = i;
                 perf_result = perf_i;
             }
+            cerr << "Agent#" << index + 1 << " task " << game_info.task[i].s << ": perf = " << perf_i << " = " << calculate_score(game_info.task[i]) << " / " << time_i + 1 << endl;
         }
         return game_info.task[result];
     }
