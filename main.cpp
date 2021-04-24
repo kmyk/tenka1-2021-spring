@@ -128,7 +128,7 @@ constexpr int GAME_INFO_SLEEP_TIME = 5000;
 struct Bot {
     mt19937 gen;
     MasterData master_data;
-    Game game_info;
+    deque<Game> game_info;
     chrono::system_clock::time_point start_time;
     int start_game_time_ms;
     int next_call_game_info_time_ms;
@@ -139,14 +139,14 @@ struct Bot {
     Bot(mt19937& gen_)
             : gen(gen_) {
         master_data = call_master_data();
-        game_info = call_game();
-        start_game_time_ms = game_info.now;
+        game_info.push_back(call_game());
+        start_game_time_ms = game_info.back().now;
         cerr << "Start:" << start_game_time_ms << endl;
         start_time = chrono::system_clock::now();
         next_call_game_info_time_ms = get_now_game_time_ms() + GAME_INFO_SLEEP_TIME;
         fill(ALL(agent_move_finish_ms), 0);
         REP (i, NUM_AGENT) {
-            agent_move_history[i].insert(agent_move_history[i].end(), ALL(game_info.agent[i].history));
+            agent_move_history[i].insert(agent_move_history[i].end(), ALL(game_info.back().agent[i].history));
             set_move_point(i);
         }
     }
@@ -174,10 +174,13 @@ struct Bot {
         return required_time;
     }
 
-    const double calculate_score(const Task& task) {
+    const double calculate_score(int task_index) {
         // 自分の達成による過去の得点の減少分は無視する
-        int remaining_time = master_data.game_period - game_info.now;
-        double predicted_speed = (double)(task.total + 100) / (game_info.now - task.t + 1);
+        const Task& task = game_info.back().task[task_index];
+        int remaining_time = master_data.game_period - game_info.back().now;
+        int previous_total = task_index < game_info.front().task.size() ? game_info.front().task[task_index].total : 0;
+        int previous_time = task_index < game_info.front().task.size() ? game_info.front().task[task_index].t : task.t;
+        double predicted_speed = (double)(task.total - previous_total) / (game_info.back().now - previous_time + 1);
         double predicted_total = task.total + predicted_speed * remaining_time + 100;
         return (double)task.weight / predicted_total;
     }
@@ -209,7 +212,8 @@ struct Bot {
                     }
                     continue;
                 }
-                for (auto&& task : game_info.task) {
+                REP (task_index, game_info.back().task.size()) {
+                    const Task& task = game_info.back().task[task_index];
                     if (task.s == "K") continue;
                     REP (m, task.s.size()) {
                         if (s.size() >= m and s.compare((int)s.size() - m, m, task.s, 0, m) == 0) {
@@ -219,7 +223,7 @@ struct Bot {
                                 time_delta += calculate_required_time_between_checkpoints(b, c);
                                 b = c;
                             }
-                            double score_delta = calculate_score(task);
+                            double score_delta = calculate_score(task_index);
                             cur.emplace_back(s + task.s.substr(m), time + time_delta, score + score_delta);
                         }
                     }
@@ -290,7 +294,7 @@ struct Bot {
 
     double get_now_score() {
         double score = 0.0;
-        for (const auto& task : game_info.task) {
+        for (const auto& task : game_info.back().task) {
             if (task.total == 0) continue;
             score += (double)(task.weight * task.count) / task.total;
         }
@@ -316,7 +320,11 @@ struct Bot {
             // ゲーム情報更新
             if (next_call_game_info_time_ms < now_game_time_ms) {
                 cerr << "Update GameInfo" << endl;
-                game_info = call_game();
+                game_info.push_back(call_game());
+                // 直近 3 分まで保持する
+                while (game_info.size() >= 3 * 60 * 1000 / GAME_INFO_SLEEP_TIME) {
+                    game_info.pop_front();
+                }
                 next_call_game_info_time_ms = get_now_game_time_ms() + GAME_INFO_SLEEP_TIME;
                 cerr << "Score: " << get_now_score() << endl;
             }
