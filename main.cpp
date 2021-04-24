@@ -2,6 +2,7 @@
 #include <cassert>
 #include <chrono>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <queue>
 #include <random>
@@ -174,7 +175,7 @@ struct Bot {
         return required_time;
     }
 
-    const double calculate_score(int task_index) {
+    const double predict_score(int task_index) {
         // 自分の達成による過去の得点の減少分は無視する
         const Task& task = game_info.back().task[task_index];
         int remaining_time = master_data.game_period - game_info.back().now;
@@ -183,6 +184,11 @@ struct Bot {
         double predicted_speed = (double)(task.total - previous_total) / (game_info.back().now - previous_time + 1);
         double predicted_total = task.total + predicted_speed * remaining_time + 1;
         return (double)task.weight / predicted_total;
+    }
+
+    const double calculate_current_score(const Task& task) {
+        if (task.total == 0) return INFINITY;
+        return (double)task.weight / task.total;
     }
 
     pair<int, int> get_checkpoint(char c) {
@@ -223,7 +229,7 @@ struct Bot {
                                 time_delta += calculate_required_time_between_checkpoints(b, c);
                                 b = c;
                             }
-                            double score_delta = calculate_score(task_index);
+                            double score_delta = predict_score(task_index);
                             cur.emplace_back(s + task.s.substr(m), time + time_delta, score + score_delta);
                         }
                     }
@@ -326,6 +332,15 @@ struct Bot {
                     game_info.pop_front();
                 }
                 next_call_game_info_time_ms = get_now_game_time_ms() + GAME_INFO_SLEEP_TIME;
+                REP (task_index, game_info.back().task.size()) {
+                    const Task& task = game_info.back().task[task_index];
+                    cerr << "task #" << task_index << ": " << task.s << string(MAX_LEN_TASK - (int)task.s.size(), ' ');
+                    cerr << " : predicted score = " << fixed << setprecision(3) << predict_score(task_index);
+                    cerr << "; current score = " << fixed << setprecision(3) << calculate_current_score(task);
+                    cerr << "; count = " << setw(3) << task.count;
+                    cerr << "; total = " << setw(5) << task.total;
+                    cerr << endl;
+                }
                 cerr << "Score: " << get_now_score() << endl;
             }
 
