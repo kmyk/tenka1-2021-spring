@@ -145,13 +145,47 @@ struct Bot {
         next_call_game_info_time_ms = get_now_game_time_ms() + GAME_INFO_SLEEP_TIME;
         fill(ALL(agent_move_finish_ms), 0);
         REP (i, NUM_AGENT) {
+            agent_move_history[i].insert(agent_move_history[i].end(), ALL(game_info.agent[i].history));
             set_move_point(i);
         }
     }
 
-    const Task& choice_task() {
-        int r = uniform_int_distribution<>(0, game_info.task.size() - 1)(gen);
-        return game_info.task[r];
+    const int calculate_required_time_for_move(pair<int, int> src, pair<int, int> dst) {
+        // 連続して移動するときの誤差は無視する
+        int dx = dst.first - src.first;
+        int dy = dst.second - src.second;
+        return ceil(100 * sqrt(dx * dx + dy * dy));
+    }
+
+    const int calculate_required_time_for_task(int index, const Task& task) {
+        assert (not agent_move_history[index].empty());
+        auto current_point = master_data.checkpoints[agent_move_history[index].back() - 'A'];
+        int required_time = 0;
+        for (char c : task.s) {
+            auto next_point = get_checkpoint(c);
+            required_time += calculate_required_time_for_move(current_point, next_point);
+            current_point = next_point;
+        }
+        return required_time;
+    }
+
+    const int calculate_score(const Task& task) {
+        // 自分の達成による過去の得点の減少分は無視する
+        return task.weight / (task.total + 1);
+    }
+
+    const Task choice_task(int index) {
+        int result = uniform_int_distribution<>(0, game_info.task.size() - 1)(gen);
+        double perf_result = calculate_score(game_info.task[result]) / (calculate_required_time_for_task(index, game_info.task[result]) + 1);
+        REP (i, game_info.task.size()) {
+            int time_i = calculate_required_time_for_task(index, game_info.task[i]);
+            double perf_i = calculate_score(game_info.task[i]) / (time_i + 1);
+            if (perf_result < perf_i) {
+                result = i;
+                perf_result = perf_i;
+            }
+        }
+        return game_info.task[result];
     }
 
     pair<int, int> get_checkpoint(char c) {
@@ -160,18 +194,19 @@ struct Bot {
 
     // 移動予定を設定
     void set_move_point(int index) {
-        const auto& next_task = choice_task();
+        const auto& next_task = choice_task(index);
         cerr << "Agent#" << index + 1 << " next task:" << next_task.s << endl;
 
         for (char c : next_task.s) {
-            auto before_point = agent_move_history[index].empty() ? make_pair(0, 0) : master_data.checkpoints[agent_move_history[index].back() - 'A'];
+            assert (not agent_move_history[index].empty());
+            auto before_point = master_data.checkpoints[agent_move_history[index].back() - 'A'];
             auto move_point = get_checkpoint(c);
 
             // 移動先が同じ場所の場合判定が入らないため別の箇所に移動してからにする
             if (before_point == move_point) {
                 int x = move_point.first + 1;
                 if (x > AREA_SIZE) {
-                    x = move_point.first - 1
+                    x = move_point.first - 1;
                 }
                 agent_move_point_queue[index].push({x, move_point.second});
             }
