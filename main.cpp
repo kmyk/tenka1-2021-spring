@@ -22,7 +22,7 @@ struct MasterData {
     int game_period;
     int max_len_task;
     int num_agent;
-    vector<pair<int, int>> checkpoints;
+    array<pair<int, int>, 26> checkpoints;
     int area_size;
 };
 
@@ -47,7 +47,7 @@ struct Task {
 
 struct Game {
     int now;
-    vector<Agent> agent;
+    array<Agent, NUM_AGENT> agent;
     vector<Task> task;
     int next_task;
 };
@@ -61,7 +61,6 @@ MasterData call_master_data() {
     cout << "master_data" << endl;
     MasterData res;
     cin >> res.game_period >> res.max_len_task >> res.num_agent;
-    res.checkpoints = vector<pair<int, int>>(26);
     for (auto& c : res.checkpoints) {
         cin >> c.first >> c.second;
     }
@@ -77,7 +76,6 @@ Game call_game() {
     Game res;
     int num_agent, num_task;
     cin >> res.now >> num_agent >> num_task;
-    res.agent.resize(num_agent);
     for (auto& a : res.agent) {
         int num_move;
         cin >> num_move;
@@ -133,9 +131,9 @@ struct Bot {
     chrono::system_clock::time_point start_time;
     int start_game_time_ms;
     int next_call_game_info_time_ms;
-    vector<int> agent_move_finish_ms;
-    vector<queue<pair<int, int>>> agent_move_point_queue;
-    vector<pair<int, int>> agent_last_point;
+    array<int, NUM_AGENT> agent_move_finish_ms;
+    array<queue<pair<int, int>>, NUM_AGENT> agent_move_point_queue;
+    array<deque<char>, NUM_AGENT> agent_move_history;
 
     Bot(mt19937& gen_)
             : gen(gen_) {
@@ -145,11 +143,8 @@ struct Bot {
         cerr << "Start:" << start_game_time_ms << endl;
         start_time = chrono::system_clock::now();
         next_call_game_info_time_ms = get_now_game_time_ms() + GAME_INFO_SLEEP_TIME;
-        agent_move_finish_ms.resize(NUM_AGENT);
-        agent_move_point_queue.resize(NUM_AGENT);
-        agent_last_point.resize(NUM_AGENT);
+        fill(ALL(agent_move_finish_ms), 0);
         REP (i, NUM_AGENT) {
-            agent_last_point[i] = {(int)game_info.agent[i].move.back().x, (int)game_info.agent[i].move.back().y};
             set_move_point(i);
         }
     }
@@ -169,7 +164,7 @@ struct Bot {
         cerr << "Agent#" << index + 1 << " next task:" << next_task.s << endl;
 
         for (char c : next_task.s) {
-            auto before_point = agent_last_point[index];
+            auto before_point = agent_move_history[index].empty() ? make_pair(0, 0) : master_data.checkpoints[agent_move_history[index].back() - 'A'];
             auto move_point = get_checkpoint(c);
 
             // 移動先が同じ場所の場合判定が入らないため別の箇所に移動してからにする
@@ -180,7 +175,10 @@ struct Bot {
             }
 
             agent_move_point_queue[index].push(move_point);
-            agent_last_point[index] = move_point;
+            agent_move_history[index].push_back(c);
+            if (agent_move_history[index].size() > MAX_LEN_TASK) {
+                agent_move_history[index].pop_front();
+            }
         }
     }
 
