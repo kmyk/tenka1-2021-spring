@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstdlib>
@@ -157,6 +158,10 @@ struct Bot {
         return ceil(100 * sqrt(dx * dx + dy * dy));
     }
 
+    const int calculate_required_time_between_checkpoints(char src, char dst) {
+        return calculate_required_time_for_move(get_checkpoint(src), get_checkpoint(dst));
+    }
+
     const int calculate_required_time_for_task(int index, const Task& task) {
         assert (not agent_move_history[index].empty());
         auto current_point = master_data.checkpoints[agent_move_history[index].back() - 'A'];
@@ -177,34 +182,71 @@ struct Bot {
         return (double)task.weight / predicted_total;
     }
 
-    const Task choice_task(int index) {
-        int result = uniform_int_distribution<>(0, game_info.task.size() - 1)(gen);
-        double perf_result = calculate_score(game_info.task[result]) / (calculate_required_time_for_task(index, game_info.task[result]) + 1);
-        REP (i, game_info.task.size()) {
-            int time_i = calculate_required_time_for_task(index, game_info.task[i]);
-            double score_i = calculate_score(game_info.task[i]) * uniform_real_distribution<double>(0.8, 1.2)(gen);
-            double perf_i = score_i / (time_i + 1);
-            if (perf_result < perf_i) {
-                result = i;
-                perf_result = perf_i;
-            }
-            cerr << "Agent#" << index + 1 << " task " << game_info.task[i].s << ": perf = " << perf_i << " = " << calculate_score(game_info.task[i]) << " / " << time_i + 1 << endl;
-        }
-        return game_info.task[result];
-    }
-
     pair<int, int> get_checkpoint(char c) {
         return master_data.checkpoints[c - 'A'];
     }
 
     // 移動予定を設定
     void set_move_point(int index) {
-        const auto& next_task = choice_task(index);
-        cerr << "Agent#" << index + 1 << " next task:" << next_task.s << endl;
+        assert (not agent_move_history[index].empty());
 
-        for (char c : next_task.s) {
-            assert (not agent_move_history[index].empty());
-            auto before_point = master_data.checkpoints[agent_move_history[index].back() - 'A'];
+        // ビームサーチ
+        auto compare_state = [](tuple<string, int, double> a, tuple<string, int, double> b) {
+            return get<2>(a) / (get<1>(a) + 100) > get<2>(b) / (get<1>(b) + 100);
+        };
+        vector<tuple<string, int, double> > cur;
+        cur.emplace_back(string(ALL(agent_move_history[index])), 0, 0);
+        tuple<string, int, double> best_state = cur.back();
+
+        REP (iteration, 15) {
+            vector<tuple<string, int, double> > prv;
+            prv.swap(cur);
+            for (auto&& state : prv) {
+                auto&& [s, time, score] = state;
+                if (s.length() >= MAX_LEN_TASK * 10) {
+                    if (compare_state(state, best_state)) {
+                        best_state = state;
+                    }
+                    continue;
+                }
+                for (auto&& task : game_info.task) {
+                    if (task.s == "K") continue;
+                    REP (m, task.s.size()) {
+                        if (s.size() >= m and s.compare((int)s.size() - m, m, task.s, 0, m) == 0) {
+                            int time_delta = 0;
+                            char b = s.back();
+                            for (char c : task.s.substr(m)) {
+                                time_delta += calculate_required_time_between_checkpoints(b, c);
+                                b = c;
+                            }
+                            double score_delta = calculate_score(task);
+                            cur.emplace_back(s + task.s.substr(m), time + time_delta, score + score_delta);
+                        }
+                    }
+                }
+            }
+
+            constexpr int WIDTH = 100;
+            sort(ALL(cur), compare_state);
+            if (cur.size() >= WIDTH) {
+                cur.resize(WIDTH);
+            }
+        }
+        for (auto&& state : cur) {
+            if (compare_state(state, best_state)) {
+                best_state = state;
+            }
+        }
+
+        string s = get<0>(best_state).substr(agent_move_history[index].size());
+        if (s.size() >= MAX_LEN_TASK * 3) {
+            s.resize(MAX_LEN_TASK * 3);
+        }
+        cerr << "Agent#" << index + 1 << " move_plan: " << string(ALL(agent_move_history[index])) << " -> " << s << endl;
+        assert (not agent_move_history[index].empty());
+        char b = agent_move_history[index].back();
+        for (char c : s) {
+            auto before_point = get_checkpoint(b);
             auto move_point = get_checkpoint(c);
 
             // 移動先が同じ場所の場合判定が入らないため別の箇所に移動してからにする
@@ -221,6 +263,7 @@ struct Bot {
             if (agent_move_history[index].size() > MAX_LEN_TASK) {
                 agent_move_history[index].pop_front();
             }
+            b = c;
         }
     }
 
