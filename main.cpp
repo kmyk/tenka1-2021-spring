@@ -260,7 +260,7 @@ struct Bot {
 
             agent_move_point_queue[index].push(move_point);
             agent_move_history[index].push_back(c);
-            if (agent_move_history[index].size() > MAX_LEN_TASK) {
+            while (agent_move_history[index].size() > MAX_LEN_TASK) {
                 agent_move_history[index].pop_front();
             }
             b = c;
