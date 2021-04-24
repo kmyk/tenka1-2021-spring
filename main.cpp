@@ -169,9 +169,11 @@ struct Bot {
 
             // 移動先が同じ場所の場合判定が入らないため別の箇所に移動してからにする
             if (before_point == move_point) {
-                int tmp_x = AREA_SIZE / 2;
-                int tmp_y = AREA_SIZE / 2;
-                agent_move_point_queue[index].push({tmp_x, tmp_y});
+                int x = move_point.first + 1;
+                if (x > AREA_SIZE) {
+                    x = move_point.first - 1
+                }
+                agent_move_point_queue[index].push({x, move_point.second});
             }
 
             agent_move_point_queue[index].push(move_point);
