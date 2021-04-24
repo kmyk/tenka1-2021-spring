@@ -182,7 +182,8 @@ struct Bot {
         double perf_result = calculate_score(game_info.task[result]) / (calculate_required_time_for_task(index, game_info.task[result]) + 1);
         REP (i, game_info.task.size()) {
             int time_i = calculate_required_time_for_task(index, game_info.task[i]);
-            double perf_i = calculate_score(game_info.task[i]) / (time_i + 1);
+            double score_i = calculate_score(game_info.task[i]) * uniform_real_distribution<double>(0.8, 1.2)(gen);
+            double perf_i = score_i / (time_i + 1);
             if (perf_result < perf_i) {
                 result = i;
                 perf_result = perf_i;
