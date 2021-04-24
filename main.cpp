@@ -321,7 +321,7 @@ struct Bot {
                 cerr << "Score: " << get_now_score() << endl;
             }
 
-            this_thread::sleep_for(chrono::milliseconds(50));
+            this_thread::sleep_for(chrono::milliseconds(10));
         }
     }
 };
