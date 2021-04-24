@@ -286,7 +286,6 @@ struct Bot {
         auto [x, y] = agent_move_point_queue[index].front();
         agent_move_point_queue[index].pop();
         auto move_next_res = call_move_next(index + 1, x, y);
-        cerr << "Agent#" << index + 1 << " move_next to (" << x << ", " << y << ")" << endl;
 
         agent_move_finish_ms[index] = move_next_res.move[1].t + 100;
 
