@@ -273,7 +273,7 @@ struct Bot {
                 cerr << "Score: " << get_now_score() << endl;
             }
 
-            this_thread::sleep_for(chrono::milliseconds(500));
+            this_thread::sleep_for(chrono::milliseconds(50));
         }
     }
 };
