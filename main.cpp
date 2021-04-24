@@ -181,7 +181,7 @@ struct Bot {
         int remaining_time = master_data.game_period - game_info.back().now;
         int previous_total = task_index < game_info.front().task.size() ? game_info.front().task[task_index].total : 0;
         int previous_time = task_index < game_info.front().task.size() ? game_info.front().task[task_index].t : task.t;
-        double predicted_speed = (double)(task.total - previous_total) / (game_info.back().now - previous_time + 1);
+        double predicted_speed = (double)(task.total - previous_total) / (game_info.back().now - previous_time + 1) * 0.7;
         double predicted_total = task.total + predicted_speed * remaining_time + 1;
         return (double)task.weight / predicted_total;
     }
