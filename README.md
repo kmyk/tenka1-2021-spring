@@ -1,5 +1,8 @@
-```
-# call_api.py の YOUR_TOKEN を書き換え
-g++ -std=gnu++17 main.cpp -o main
-python3 call_api.py ./main
+# 天下一 Game Battle Contest 2021 Spring
+
+## 実行方法
+
+```console
+$ g++ -std=c++17 main.cpp
+$ TOKEN=... python3 call_api.py ./a.out
 ```
