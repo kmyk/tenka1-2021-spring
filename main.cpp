@@ -1,3 +1,4 @@
+#include <cassert>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -13,7 +14,9 @@
 #define ALL(x) std::begin(x), std::end(x)
 using namespace std;
 
-const int GAME_INFO_SLEEP_TIME = 5000;
+constexpr int MAX_LEN_TASK = 10;
+constexpr int NUM_AGENT = 5;
+constexpr int AREA_SIZE = 30;
 
 struct MasterData {
     int game_period;
@@ -63,6 +66,9 @@ MasterData call_master_data() {
         cin >> c.first >> c.second;
     }
     cin >> res.area_size;
+    assert (res.max_len_task == MAX_LEN_TASK);
+    assert (res.num_agent == NUM_AGENT);
+    assert (res.area_size == AREA_SIZE);
     return res;
 }
 
@@ -103,14 +109,22 @@ Move read_move() {
 }
 
 Move call_move(int index, int x, int y) {
+    assert (1 <= index and index <= NUM_AGENT);
+    assert (0 <= x and x <= AREA_SIZE);
+    assert (0 <= y and y <= AREA_SIZE);
     cout << "move " << index << "-" << x << "-" << y << endl;
     return read_move();
 }
 
 Move call_move_next(int index, int x, int y) {
+    assert (1 <= index and index <= 5);
+    assert (0 <= x and x <= AREA_SIZE);
+    assert (0 <= y and y <= AREA_SIZE);
     cout << "move_next " << index << "-" << x << "-" << y << endl;
     return read_move();
 }
+
+constexpr int GAME_INFO_SLEEP_TIME = 5000;
 
 struct Bot {
     mt19937 gen;
@@ -131,10 +145,10 @@ struct Bot {
         cerr << "Start:" << start_game_time_ms << endl;
         start_time = chrono::system_clock::now();
         next_call_game_info_time_ms = get_now_game_time_ms() + GAME_INFO_SLEEP_TIME;
-        agent_move_finish_ms.resize(master_data.num_agent);
-        agent_move_point_queue.resize(master_data.num_agent);
-        agent_last_point.resize(master_data.num_agent);
-        REP (i, master_data.num_agent) {
+        agent_move_finish_ms.resize(NUM_AGENT);
+        agent_move_point_queue.resize(NUM_AGENT);
+        agent_last_point.resize(NUM_AGENT);
+        REP (i, NUM_AGENT) {
             agent_last_point[i] = {(int)game_info.agent[i].move.back().x, (int)game_info.agent[i].move.back().y};
             set_move_point(i);
         }
@@ -160,8 +174,8 @@ struct Bot {
 
             // 移動先が同じ場所の場合判定が入らないため別の箇所に移動してからにする
             if (before_point == move_point) {
-                int tmp_x = master_data.area_size / 2;
-                int tmp_y = master_data.area_size / 2;
+                int tmp_x = AREA_SIZE / 2;
+                int tmp_y = AREA_SIZE / 2;
                 agent_move_point_queue[index].push({tmp_x, tmp_y});
             }
 
@@ -206,7 +220,7 @@ struct Bot {
             int now_game_time_ms = get_now_game_time_ms();
 
             // エージェントを移動させる
-            REP (i, master_data.num_agent) {
+            REP (i, NUM_AGENT) {
                 if (agent_move_finish_ms[i] < now_game_time_ms) {
                     auto move_next_res = move_next(i);
                     // 次の移動予定がない場合もう一度実行する
